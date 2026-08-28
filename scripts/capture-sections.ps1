@@ -178,12 +178,17 @@ function Inspect-CarouselState {
     $expression = @"
 (() => {
   const carousel = document.querySelector('[data-carousel]');
-  const visibleSlides = [...carousel.querySelectorAll('[data-carousel-slide]')]
-    .filter((slide) => !slide.hidden);
-  const activeSlide = visibleSlides[0];
+  const slides = [...carousel.querySelectorAll('[data-carousel-slide]')];
+  const activeSlides = slides.filter((slide) => slide.classList.contains('is-active'));
+  const visuallyVisibleSlides = slides.filter((slide) => {
+    const styles = getComputedStyle(slide);
+    return styles.visibility !== 'hidden' && Number(styles.opacity) > 0.01;
+  });
+  const activeSlide = activeSlides[0];
   const image = activeSlide?.querySelector('img');
   return {
-    visibleCount: visibleSlides.length,
+    activeCount: activeSlides.length,
+    visibleCount: visuallyVisibleSlides.length,
     activeName: activeSlide?.dataset.leaderName || '',
     imageReady: Boolean(image?.complete && image?.naturalWidth),
     documentWidth: document.documentElement.scrollWidth,
@@ -202,6 +207,7 @@ function Inspect-CarouselState {
     [PSCustomObject]@{
         Device = $Device
         ActiveName = $value.activeName
+        ActiveSlides = $value.activeCount
         VisibleSlides = $value.visibleCount
         ImageReady = $value.imageReady
         NoOverflow = $value.documentWidth -eq $Width
@@ -237,9 +243,12 @@ function Test-CarouselAutoplay {
   const carousel = document.querySelector('[data-carousel]');
   carousel.scrollIntoView({ block: 'center' });
   await new Promise((resolve) => setTimeout(resolve, 400));
+  carousel.dispatchEvent(new MouseEvent('mouseenter'));
+  const activeSlide = carousel.querySelector('[data-carousel-slide].is-active');
   return {
-    name: carousel.querySelector('[data-carousel-slide]:not([hidden])').dataset.leaderName,
-    buttons: carousel.querySelectorAll('button').length
+    name: activeSlide.dataset.leaderName,
+    buttons: carousel.querySelectorAll('button').length,
+    transitionDuration: getComputedStyle(activeSlide).transitionDuration
   };
 })()
 "@
@@ -247,14 +256,23 @@ function Test-CarouselAutoplay {
         returnByValue = $true
     }
 
-    Start-Sleep -Milliseconds 5400
+    Start-Sleep -Milliseconds 6000
     $afterAdvance = Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
         expression = @"
 (() => {
   const carousel = document.querySelector('[data-carousel]');
+  const slides = [...carousel.querySelectorAll('[data-carousel-slide]')];
+  const activeSlides = slides.filter((slide) => slide.classList.contains('is-active'));
   return {
-    name: carousel.querySelector('[data-carousel-slide]:not([hidden])').dataset.leaderName,
-    visibleSlides: [...carousel.querySelectorAll('[data-carousel-slide]')].filter((slide) => !slide.hidden).length
+    name: activeSlides[0]?.dataset.leaderName || '',
+    activeSlides: activeSlides.length,
+    visibleSlides: slides.filter((slide) => {
+      const styles = getComputedStyle(slide);
+      return styles.visibility !== 'hidden' && Number(styles.opacity) > 0.01;
+    }).length,
+    inactiveSlidesAreInert: slides
+      .filter((slide) => !slide.classList.contains('is-active'))
+      .every((slide) => slide.inert && slide.getAttribute('aria-hidden') === 'true')
   };
 })()
 "@
@@ -264,8 +282,12 @@ function Test-CarouselAutoplay {
     [PSCustomObject]@{
         InitialPresidents = $initial.result.result.value.name -eq 'Atharv Verma and Jagannath Athmaraman'
         ControlFree = $initial.result.result.value.buttons -eq 0
+        SmoothTransition = $initial.result.result.value.transitionDuration -match '0.9s'
+        RotatesWhileHovered = $afterAdvance.result.result.value.name -eq 'Shrenik Vaidya'
         AdvancedToShrenik = $afterAdvance.result.result.value.name -eq 'Shrenik Vaidya'
+        SingleActiveSlide = $afterAdvance.result.result.value.activeSlides -eq 1
         SingleVisibleSlide = $afterAdvance.result.result.value.visibleSlides -eq 1
+        InactiveSlidesAreInert = $afterAdvance.result.result.value.inactiveSlidesAreInert
     }
 }
 

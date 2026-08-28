@@ -79,11 +79,9 @@ const carouselDelay = 5000;
 
 document.querySelectorAll('[data-carousel]').forEach((carousel) => {
   const slides = Array.from(carousel.querySelectorAll('[data-carousel-slide]'));
-  const viewport = carousel.querySelector('[data-carousel-viewport]');
   let activeIndex = 0;
   let rotationTimer = null;
   let carouselIsVisible = false;
-  let interactionSuspended = false;
 
   const clearRotation = () => {
     window.clearTimeout(rotationTimer);
@@ -100,9 +98,9 @@ document.querySelectorAll('[data-carousel]').forEach((carousel) => {
 
     slides.forEach((slide, index) => {
       const isActive = index === activeIndex;
-      slide.hidden = !isActive;
       slide.classList.toggle('is-active', isActive);
       slide.setAttribute('aria-hidden', String(!isActive));
+      slide.inert = !isActive;
     });
 
     preloadNextSlide();
@@ -110,7 +108,7 @@ document.querySelectorAll('[data-carousel]').forEach((carousel) => {
 
   const scheduleRotation = () => {
     clearRotation();
-    if (interactionSuspended || !carouselIsVisible || document.hidden) return;
+    if (!carouselIsVisible || document.hidden) return;
 
     rotationTimer = window.setTimeout(() => {
       showSlide(activeIndex + 1);
@@ -118,34 +116,11 @@ document.querySelectorAll('[data-carousel]').forEach((carousel) => {
     }, carouselDelay);
   };
 
-  carousel.addEventListener('mouseenter', () => {
-    interactionSuspended = true;
-    clearRotation();
-  });
-
-  carousel.addEventListener('mouseleave', () => {
-    interactionSuspended = false;
-    scheduleRotation();
-  });
-
-  viewport.addEventListener('touchstart', () => {
-    interactionSuspended = true;
-    clearRotation();
-  }, { passive: true });
-
-  const resumeAfterTouch = () => {
-    interactionSuspended = false;
-    scheduleRotation();
-  };
-
-  viewport.addEventListener('touchend', resumeAfterTouch, { passive: true });
-  viewport.addEventListener('touchcancel', resumeAfterTouch, { passive: true });
-
   const visibilityObserver = 'IntersectionObserver' in window
     ? new IntersectionObserver((entries) => {
       carouselIsVisible = entries[0].isIntersecting;
       scheduleRotation();
-    }, { threshold: 0.25 })
+    }, { threshold: 0.1 })
     : null;
 
   if (visibilityObserver) {
