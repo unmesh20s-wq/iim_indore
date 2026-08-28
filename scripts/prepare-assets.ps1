@@ -16,6 +16,22 @@ function Export-ResizedJpeg {
 
     $sourceImage = [System.Drawing.Image]::FromFile($Source)
     try {
+        $orientationPropertyId = 0x0112
+        if ($sourceImage.PropertyIdList -contains $orientationPropertyId) {
+            $orientation = $sourceImage.GetPropertyItem($orientationPropertyId).Value[0]
+            $rotation = switch ($orientation) {
+                2 { [System.Drawing.RotateFlipType]::RotateNoneFlipX }
+                3 { [System.Drawing.RotateFlipType]::Rotate180FlipNone }
+                4 { [System.Drawing.RotateFlipType]::Rotate180FlipX }
+                5 { [System.Drawing.RotateFlipType]::Rotate90FlipX }
+                6 { [System.Drawing.RotateFlipType]::Rotate90FlipNone }
+                7 { [System.Drawing.RotateFlipType]::Rotate270FlipX }
+                8 { [System.Drawing.RotateFlipType]::Rotate270FlipNone }
+                default { [System.Drawing.RotateFlipType]::RotateNoneFlipNone }
+            }
+            $sourceImage.RotateFlip($rotation)
+        }
+
         $scale = [Math]::Min(1.0, [double]$MaxWidth / [double]$sourceImage.Width)
         $width = [Math]::Round($sourceImage.Width * $scale)
         $height = [Math]::Round($sourceImage.Height * $scale)
@@ -80,5 +96,29 @@ Copy-Item `
     -LiteralPath 'C:\Users\Unmesh\Downloads\1784053634509.jpg' `
     -Destination (Join-Path $assets '180dc-iim-indore-logo.jpg') `
     -Force
+
+Export-ResizedJpeg `
+    -Source 'C:\Users\Unmesh\Downloads\Shrenik Shital Vaidya.JPG' `
+    -Destination (Join-Path $assets 'leadership-shrenik-vaidya.jpg') `
+    -MaxWidth 1400 `
+    -Quality 88
+
+Export-ResizedJpeg `
+    -Source 'C:\Users\Unmesh\Downloads\Diya Choudhary.JPG' `
+    -Destination (Join-Path $assets 'leadership-diya-choudhary.jpg') `
+    -MaxWidth 1400 `
+    -Quality 88
+
+Export-ResizedJpeg `
+    -Source 'C:\Users\Unmesh\Downloads\WhatsApp Image 2026-08-24 at 6.08.22 PM.jpeg' `
+    -Destination (Join-Path $assets 'leadership-prahith-m-v.jpg') `
+    -MaxWidth 1400 `
+    -Quality 88
+
+Export-ResizedJpeg `
+    -Source 'C:\Users\Unmesh\Downloads\1723912977738.jpg' `
+    -Destination (Join-Path $assets 'leadership-aditya-kannojia.jpg') `
+    -MaxWidth 1400 `
+    -Quality 88
 
 Get-ChildItem -LiteralPath $assets | Select-Object Name, Length

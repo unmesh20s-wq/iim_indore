@@ -168,6 +168,107 @@ function Capture-Section {
     }
 }
 
+function Inspect-CarouselState {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$Device,
+        [int]$Width
+    )
+
+    $expression = @"
+(() => {
+  const carousel = document.querySelector('[data-carousel]');
+  const visibleSlides = [...carousel.querySelectorAll('[data-carousel-slide]')]
+    .filter((slide) => !slide.hidden);
+  const activeSlide = visibleSlides[0];
+  const image = activeSlide?.querySelector('img');
+  return {
+    visibleCount: visibleSlides.length,
+    activeName: activeSlide?.dataset.leaderName || '',
+    imageReady: Boolean(image?.complete && image?.naturalWidth),
+    documentWidth: document.documentElement.scrollWidth,
+    buttonCount: carousel.querySelectorAll('button').length,
+    numberLabelCount: carousel.querySelectorAll('.leader-slide__number, [data-carousel-status], [data-carousel-index]').length
+  };
+})()
+"@
+
+    $evaluation = Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
+        expression = $expression
+        returnByValue = $true
+    }
+    $value = $evaluation.result.result.value
+
+    [PSCustomObject]@{
+        Device = $Device
+        ActiveName = $value.activeName
+        VisibleSlides = $value.visibleCount
+        ImageReady = $value.imageReady
+        NoOverflow = $value.documentWidth -eq $Width
+        NoButtons = $value.buttonCount -eq 0
+        NoNumberLabels = $value.numberLabelCount -eq 0
+    }
+}
+
+function Test-CarouselAutoplay {
+    param([System.Net.WebSockets.ClientWebSocket]$WebSocket)
+
+    Invoke-CdpCommand -WebSocket $WebSocket -Method 'Emulation.setDeviceMetricsOverride' -Parameters @{
+        width = 1440
+        height = 1000
+        deviceScaleFactor = 1
+        mobile = $false
+        screenWidth = 1440
+        screenHeight = 1000
+    } | Out-Null
+    Invoke-CdpCommand -WebSocket $WebSocket -Method 'Emulation.setEmulatedMedia' -Parameters @{
+        features = @(
+            @{ name = 'prefers-reduced-motion'; value = 'no-preference' }
+        )
+    } | Out-Null
+    Invoke-CdpCommand -WebSocket $WebSocket -Method 'Page.navigate' -Parameters @{
+        url = 'http://127.0.0.1:4173/'
+    } | Out-Null
+    Start-Sleep -Milliseconds 700
+
+    $initial = Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
+        expression = @"
+(async () => {
+  const carousel = document.querySelector('[data-carousel]');
+  carousel.scrollIntoView({ block: 'center' });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  return {
+    name: carousel.querySelector('[data-carousel-slide]:not([hidden])').dataset.leaderName,
+    buttons: carousel.querySelectorAll('button').length
+  };
+})()
+"@
+        awaitPromise = $true
+        returnByValue = $true
+    }
+
+    Start-Sleep -Milliseconds 5400
+    $afterAdvance = Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
+        expression = @"
+(() => {
+  const carousel = document.querySelector('[data-carousel]');
+  return {
+    name: carousel.querySelector('[data-carousel-slide]:not([hidden])').dataset.leaderName,
+    visibleSlides: [...carousel.querySelectorAll('[data-carousel-slide]')].filter((slide) => !slide.hidden).length
+  };
+})()
+"@
+        returnByValue = $true
+    }
+
+    [PSCustomObject]@{
+        InitialPresidents = $initial.result.result.value.name -eq 'Atharv Verma and Jagannath Athmaraman'
+        ControlFree = $initial.result.result.value.buttons -eq 0
+        AdvancedToShrenik = $afterAdvance.result.result.value.name -eq 'Shrenik Vaidya'
+        SingleVisibleSlide = $afterAdvance.result.result.value.visibleSlides -eq 1
+    }
+}
+
 try {
     $target = $null
     foreach ($attempt in 1..50) {
@@ -199,9 +300,12 @@ try {
     } | Out-Null
 
     $captures = @()
+    $carouselChecks = @()
     $viewports = @(
         @{ Name = 'desktop'; Width = 1440; Height = 1000; Mobile = $false },
         @{ Name = 'tablet'; Width = 1024; Height = 768; Mobile = $false },
+        @{ Name = 'tablet-edge'; Width = 821; Height = 900; Mobile = $false },
+        @{ Name = 'mobile-narrow'; Width = 300; Height = 653; Mobile = $true },
         @{ Name = 'mobile-small'; Width = 320; Height = 568; Mobile = $true },
         @{ Name = 'mobile'; Width = 390; Height = 844; Mobile = $true }
     )
@@ -227,6 +331,11 @@ try {
                 -Height $viewport.Height
         }
 
+        $carouselChecks += Inspect-CarouselState `
+            -WebSocket $socket `
+            -Device $viewport.Name `
+            -Width $viewport.Width
+
         if ($viewport.Name -eq 'mobile') {
             Invoke-CdpCommand -WebSocket $socket -Method 'Runtime.evaluate' -Parameters @{
                 expression = "window.scrollTo(0, 0); document.querySelector('[data-menu-toggle]').click();"
@@ -244,7 +353,10 @@ try {
         }
     }
 
+    $autoplayCheck = Test-CarouselAutoplay -WebSocket $socket
     $captures | Format-Table -AutoSize
+    $carouselChecks | Format-Table -AutoSize
+    $autoplayCheck | Format-List
 }
 finally {
     if ($socket) {
