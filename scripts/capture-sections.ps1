@@ -291,6 +291,141 @@ function Test-CarouselAutoplay {
     }
 }
 
+function Save-CdpScreenshot {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$Name
+    )
+
+    $screenshot = Invoke-CdpCommand -WebSocket $WebSocket -Method 'Page.captureScreenshot' -Parameters @{
+        format = 'png'
+        fromSurface = $true
+        captureBeyondViewport = $false
+    }
+    $destination = Join-Path $outputDirectory "$Name.png"
+    [System.IO.File]::WriteAllBytes(
+        $destination,
+        [System.Convert]::FromBase64String($screenshot.result.data)
+    )
+    return $destination
+}
+
+function Test-ResourcePages {
+    param([System.Net.WebSockets.ClientWebSocket]$WebSocket)
+
+    $checks = @()
+    $resourceViewports = @(
+        @{ Name = 'desktop'; Width = 1440; Height = 1000; Mobile = $false },
+        @{ Name = 'mobile'; Width = 390; Height = 844; Mobile = $true }
+    )
+
+    foreach ($viewport in $resourceViewports) {
+        Set-Viewport `
+            -WebSocket $WebSocket `
+            -Width $viewport.Width `
+            -Height $viewport.Height `
+            -Mobile $viewport.Mobile
+
+        Invoke-CdpCommand -WebSocket $WebSocket -Method 'Page.navigate' -Parameters @{
+            url = 'http://127.0.0.1:4173/resources.html'
+        } | Out-Null
+        Start-Sleep -Milliseconds 700
+
+        $hubEvaluation = Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
+            expression = @"
+(() => {
+  const buttons = [...document.querySelectorAll('[data-resource-filters] button')];
+  const initialCount = document.querySelectorAll('.resource-card').length;
+  const originals = buttons.find((button) => button.textContent.trim() === '180DC Originals');
+  originals.click();
+  const originalsCount = document.querySelectorAll('.resource-card').length;
+  buttons.find((button) => button.textContent.trim() === 'All').click();
+
+  const input = document.querySelector('[data-resource-search]');
+  input.value = 'no-resource-can-match-this-query';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  const empty = document.querySelector('[data-resource-empty]');
+  const emptyVisible = !empty.hidden && getComputedStyle(empty).display !== 'none';
+  const emptyTitle = empty.querySelector('[data-empty-title]').textContent.trim();
+
+  document.querySelector('[data-resource-reset]').click();
+  return {
+    mainText: document.querySelector('main').innerText.trim().length,
+    initialCount,
+    originalsCount,
+    emptyVisible,
+    emptyTitle,
+    resetCount: document.querySelectorAll('.resource-card').length,
+    internalLinks: document.querySelectorAll('.resource-card__action:not([target])').length,
+    officialLinks: document.querySelectorAll('.resource-card__action[target="_blank"]').length,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth
+  };
+})()
+"@
+            returnByValue = $true
+        }
+        $hub = $hubEvaluation.result.result.value
+
+        if ($hub.mainText -lt 300) { throw "Resource hub content is missing on $($viewport.Name)." }
+        if ($hub.initialCount -ne 12) { throw "Expected 12 initial resources, found $($hub.initialCount)." }
+        if ($hub.originalsCount -ne 3) { throw "Expected 3 180DC Originals, found $($hub.originalsCount)." }
+        if (-not $hub.emptyVisible -or $hub.emptyTitle -ne 'No matching resources.') { throw 'The curated search empty state did not appear.' }
+        if ($hub.resetCount -ne 12) { throw "Resource reset returned $($hub.resetCount) cards instead of 12." }
+        if ($hub.internalLinks -ne 3 -or $hub.officialLinks -ne 9) { throw 'Internal and official-source resource actions are misclassified.' }
+        if ($hub.documentWidth -ne $viewport.Width -or $hub.viewportWidth -ne $viewport.Width) { throw "Resource hub overflows at $($viewport.Width)px." }
+
+        Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
+            expression = 'window.scrollTo(0, 0)'
+        } | Out-Null
+        $topFile = Save-CdpScreenshot -WebSocket $WebSocket -Name "resource-$($viewport.Name)-top"
+
+        Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
+            expression = "document.querySelector('[data-resource-grid]').scrollIntoView({ block: 'start' }); window.scrollBy(0, -92);"
+        } | Out-Null
+        Start-Sleep -Milliseconds 250
+        $gridFile = Save-CdpScreenshot -WebSocket $WebSocket -Name "resource-$($viewport.Name)-grid"
+
+        Invoke-CdpCommand -WebSocket $WebSocket -Method 'Page.navigate' -Parameters @{
+            url = 'http://127.0.0.1:4173/resources/guesstimation-101.html'
+        } | Out-Null
+        Start-Sleep -Milliseconds 700
+
+        $guideEvaluation = Invoke-CdpCommand -WebSocket $WebSocket -Method 'Runtime.evaluate' -Parameters @{
+            expression = @"
+(() => ({
+  title: document.querySelector('h1')?.textContent.trim() || '',
+  sections: document.querySelectorAll('.guide-content > section').length,
+  mainText: document.querySelector('main').innerText.trim().length,
+  documentWidth: document.documentElement.scrollWidth,
+  viewportWidth: document.documentElement.clientWidth
+}))()
+"@
+            returnByValue = $true
+        }
+        $guide = $guideEvaluation.result.result.value
+
+        if ($guide.title -ne 'Guesstimation 101' -or $guide.sections -ne 4 -or $guide.mainText -lt 500) { throw 'The original guide content is incomplete.' }
+        if ($guide.documentWidth -ne $viewport.Width -or $guide.viewportWidth -ne $viewport.Width) { throw "Guide page overflows at $($viewport.Width)px." }
+        $guideFile = Save-CdpScreenshot -WebSocket $WebSocket -Name "guide-$($viewport.Name)-top"
+
+        $checks += [PSCustomObject]@{
+            Viewport = $viewport.Name
+            HubWidth = $hub.documentWidth
+            InitialCards = $hub.initialCount
+            OriginalCards = $hub.originalsCount
+            EmptyState = $hub.emptyVisible
+            ResetCards = $hub.resetCount
+            GuideWidth = $guide.documentWidth
+            TopCapture = $topFile
+            GridCapture = $gridFile
+            GuideCapture = $guideFile
+        }
+    }
+
+    return $checks
+}
+
 try {
     $target = $null
     foreach ($attempt in 1..50) {
@@ -376,9 +511,11 @@ try {
     }
 
     $autoplayCheck = Test-CarouselAutoplay -WebSocket $socket
+    $resourceChecks = Test-ResourcePages -WebSocket $socket
     $captures | Format-Table -AutoSize
     $carouselChecks | Format-Table -AutoSize
     $autoplayCheck | Format-List
+    $resourceChecks | Format-Table -AutoSize
 }
 finally {
     if ($socket) {

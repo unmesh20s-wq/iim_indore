@@ -3,6 +3,14 @@ const menu = document.querySelector('[data-menu]');
 const menuToggle = document.querySelector('[data-menu-toggle]');
 const main = document.querySelector('main');
 const footer = document.querySelector('footer');
+const navGroups = Array.from(menu.querySelectorAll('[data-nav-group]'));
+
+const closeNavGroups = () => {
+  navGroups.forEach((group) => {
+    group.removeAttribute('open');
+    group.querySelector('summary').setAttribute('aria-expanded', 'false');
+  });
+};
 
 const setHeaderState = () => {
   header.classList.toggle('is-scrolled', window.scrollY > 24);
@@ -16,6 +24,7 @@ const closeMenu = () => {
   document.body.classList.remove('menu-open');
   main.removeAttribute('inert');
   footer.removeAttribute('inert');
+  closeNavGroups();
 };
 
 menuToggle.addEventListener('click', () => {
@@ -40,11 +49,38 @@ menu.querySelectorAll('a').forEach((link) => {
   link.addEventListener('click', closeMenu);
 });
 
+navGroups.forEach((group) => {
+  const summary = group.querySelector('summary');
+  summary.setAttribute('aria-expanded', 'false');
+
+  group.addEventListener('toggle', () => {
+    summary.setAttribute('aria-expanded', String(group.open));
+    if (!group.open) return;
+
+    navGroups.forEach((otherGroup) => {
+      if (otherGroup !== group) otherGroup.removeAttribute('open');
+    });
+  });
+});
+
+document.addEventListener('click', (event) => {
+  if (!menu.contains(event.target)) closeNavGroups();
+});
+
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && menuToggle.getAttribute('aria-expanded') === 'true') {
+  if (event.key !== 'Escape') return;
+
+  if (menuToggle.getAttribute('aria-expanded') === 'true') {
     closeMenu();
     menuToggle.focus();
+    return;
   }
+
+  const openGroup = navGroups.find((group) => group.open);
+  if (!openGroup) return;
+
+  openGroup.removeAttribute('open');
+  openGroup.querySelector('summary').focus();
 });
 
 const desktopNavigation = window.matchMedia('(min-width: 821px)');
