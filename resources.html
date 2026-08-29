@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Curated consulting frameworks, guides, datasets, and social-impact resources from 180 Degrees Consulting IIM Indore.">
+  <meta name="theme-color" content="#111a15">
+  <title>Student Resources | 180 Degrees Consulting IIM Indore</title>
+  <link rel="icon" href="assets/180dc-iim-indore-logo.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css">
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body class="inner-page resources-page">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="site-header site-header--solid" data-header>
+    <div class="site-header__inner">
+      <a class="brand" href="index.html#home" aria-label="180 Degrees Consulting IIM Indore, home">
+        <img src="assets/180dc-iim-indore-logo.jpg" width="200" height="200" alt="">
+        <span class="brand__name">180DC</span>
+        <span class="brand__place">IIM Indore</span>
+      </a>
+
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open menu" data-menu-toggle>
+        <span></span>
+        <span></span>
+      </button>
+
+      <nav class="site-nav" id="site-navigation" aria-label="Primary navigation" data-menu>
+        <a href="index.html#about">About</a>
+        <a href="index.html#services">Services</a>
+        <a href="index.html#approach">Approach</a>
+        <a href="index.html#leadership">Leadership</a>
+        <details class="site-nav__group" data-nav-group>
+          <summary>For students</summary>
+          <div class="site-nav__submenu">
+            <a href="index.html#join">Join 180DC</a>
+            <a href="resources.html" aria-current="page">Resources</a>
+          </div>
+        </details>
+        <a class="site-nav__cta" href="mailto:iim_indore@180dc.org?subject=Consulting%20Partnership%20Enquiry">Partner with us <span aria-hidden="true">&nearr;</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="resource-hero" aria-labelledby="resource-title">
+      <div class="container resource-hero__inner">
+        <p class="eyebrow">Student toolkit</p>
+        <h1 id="resource-title">Resources for better problem solving.</h1>
+        <p>A curated collection of frameworks, guides, and references for students interested in consulting, structured problem solving, and social impact.</p>
+      </div>
+    </section>
+
+    <section class="resource-library" aria-labelledby="library-title">
+      <div class="container">
+        <div class="resource-library__heading">
+          <div>
+            <p class="eyebrow">Curated, not archived</p>
+            <h2 id="library-title">Build your consulting toolkit.</h2>
+          </div>
+          <p>Original 180DC guides are hosted here. External material always links to its official publisher.</p>
+        </div>
+
+        <div class="resource-toolbar">
+          <div class="resource-search">
+            <label for="resource-search">Search resources</label>
+            <input id="resource-search" type="search" placeholder="Search by topic, source, or skill" autocomplete="off" data-resource-search>
+          </div>
+          <div class="resource-filters" role="group" aria-label="Filter resources by category" data-resource-filters></div>
+        </div>
+
+        <p class="resource-status" aria-live="polite" data-resource-status></p>
+        <div class="resource-grid" data-resource-grid></div>
+
+        <div class="resource-empty" data-resource-empty hidden>
+          <h2 data-empty-title>Resources coming soon.</h2>
+          <p data-empty-copy>We are currently curating high-quality material for this section.</p>
+          <button class="button button--dark" type="button" data-resource-reset>Clear filters</button>
+        </div>
+
+        <noscript>
+          <p class="resource-empty">Enable JavaScript to browse and filter the resource collection.</p>
+        </noscript>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="contact">
+    <div class="container footer-main">
+      <div class="footer-brand">
+        <img src="assets/180dc-iim-indore-logo.jpg" width="200" height="200" alt="180 Degrees Consulting IIM Indore logo" loading="lazy">
+        <div>
+          <strong>180 Degrees Consulting</strong>
+          <span>IIM Indore</span>
+        </div>
+      </div>
+
+      <div class="footer-contact">
+        <p class="eyebrow eyebrow--light">Start a conversation</p>
+        <a href="mailto:iim_indore@180dc.org">iim_indore@180dc.org <span aria-hidden="true">&nearr;</span></a>
+        <a href="mailto:president.iimindore@180dc.org">president.iimindore@180dc.org <span aria-hidden="true">&nearr;</span></a>
+      </div>
+    </div>
+
+    <div class="container footer-bottom">
+      <p>Part of the global 180 Degrees Consulting network.</p>
+      <nav class="footer-socials" aria-label="Social media">
+        <a href="https://www.instagram.com/180dc_iimi/" target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram">
+          <img src="assets/instagram.svg" width="24" height="24" alt="">
+        </a>
+        <a href="https://www.linkedin.com/company/180degrees-consulting-iim-indore/posts/?feedView=all" target="_blank" rel="noreferrer" aria-label="LinkedIn" title="LinkedIn">
+          <img src="assets/linkedin.svg" width="24" height="24" alt="">
+        </a>
+      </nav>
+      <p>&copy; <span data-year>2026</span> 180DC IIM Indore</p>
+    </div>
+  </footer>
+
+  <script src="data/resources.js"></script>
+  <script src="resources.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

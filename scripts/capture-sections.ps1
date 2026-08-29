@@ -344,7 +344,7 @@ try {
         } | Out-Null
         Start-Sleep -Milliseconds 700
 
-        foreach ($section in @('home', 'services', 'approach', 'leadership', 'join', 'contact')) {
+        foreach ($section in @('home', 'services', 'learning', 'approach', 'leadership', 'join', 'contact')) {
             $captures += Capture-Section `
                 -WebSocket $socket `
                 -Device $viewport.Name `
